@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <iostream>
 #include <sstream>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/times.h>
 #include "llvm/Pass.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
@@ -15,6 +18,13 @@
 
 using namespace llvm;
 
+static inline unsigned long long GetCycleCount(void)
+{
+  unsigned long long int x;
+     __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+     return x;
+}
+
 AbstractStringEncryptionPass::AbstractStringEncryptionPass(char ID) : ModulePass(ID) {
     
 }
@@ -22,8 +32,6 @@ AbstractStringEncryptionPass::AbstractStringEncryptionPass(char ID) : ModulePass
 bool AbstractStringEncryptionPass::runOnModule(Module &M) {
     bool changed = false;
 
-    uint64_t encryptedStringCounter = 0;
-    
     StringMapGlobalVars.clear();
     std::vector<GlobalVariable*> StringGlobalVars;
     std::vector<GlobalVariable*> StringGlobalVarsToDelete;
@@ -65,8 +73,7 @@ bool AbstractStringEncryptionPass::runOnModule(Module &M) {
         //create new global string with the encrypted string
         //@todo check if name does not exist in module
         std::ostringstream oss;
-        oss << ".encstr" << encryptedStringCounter;
-        encryptedStringCounter++;
+        oss << ".encstr" << GetCycleCount();
         Constant *cryptedStr = ConstantDataArray::getString(M.getContext(), encryptedString, true);
         GlobalVariable* gCryptedStr = new GlobalVariable(M, cryptedStr->getType(), true, GlobalValue::ExternalLinkage, cryptedStr, oss.str());
         StringMapGlobalVars[oss.str()] = gCryptedStr;
